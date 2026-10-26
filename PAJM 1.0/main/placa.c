@@ -3,6 +3,7 @@
 #include "pinos.h"
 
 static bool vpp_ligado;
+static bool motores_ligados;
 static int nivel_heartbeat;
 
 void placa_iniciar(void)
@@ -69,6 +70,17 @@ void placa_estado_seguro(void)
     gpio_set_level(PINO_RELE_VPP, 0);
     gpio_set_level(PINO_MOTOR_EN, 1);
     vpp_ligado = false;
+    motores_ligados = false;
+}
+
+bool placa_motores_ligar(void)
+{
+    if (motores_ligados) {
+        return false;
+    }
+    gpio_set_level(PINO_MOTOR_EN, 0);
+    motores_ligados = true;
+    return true;
 }
 
 void placa_vpp_desligar(void)

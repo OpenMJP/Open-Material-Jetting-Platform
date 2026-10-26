@@ -37,7 +37,8 @@ python ferramentas/bringup.py COMy
 | `main/protocolo.h` | constantes e códigos do PROTOCOL.md |
 | `main/crc.c`, `main/quadro.c` | CRC-16, CRC-32, COBS e montagem de quadros (funções puras) |
 | `main/enlace.c` | UART0 e envio/recepção de quadros |
-| `main/sessao.c` | Go-Back-N, sessão, estados e tratamento dos opcodes |
+| `main/sessao.c` | Go-Back-N, sessão, estados, estado planejado e tratamento dos opcodes |
+| `main/movimento.c` | fila de execução, HOME, JOG, MOVE, DWELL; passos por timer com rampa (AVR446) |
 | `main/parametros.c` | SET/GET/SAVE_PARAM, com persistência na NVS |
 | `main/autoteste.c` | confere os vetores da seção 10 a cada boot |
 | `teste_motores/` | projeto separado: teste manual dos eixos pelo monitor |
@@ -64,15 +65,27 @@ Decisões que se afastam da letra do PROTOCOL.md, de propósito:
 - O bit nFAULT do STATUS só é reportado com VPP ligado; sem cabeçote o
   pino pode flutuar.
 
-### Etapa 2: movimento (próxima)
+### Etapa 2: movimento (concluída)
 
-Fila de execução com créditos; HOME, JOG e MOVE com geração de passos por
-timer; CANCEL com rampa. Critério: os botões da aba de comandos manuais do
-slicer movem a máquina.
+Fila de execução com créditos (32 entradas); HOME, JOG, MOVE e DWELL;
+CANCEL para com rampa; ESTOP e falhas cortam sem rampa e desligam os
+drivers. Os passos saem de um gptimer em interrupção (núcleo 0), um eixo
+por vez, com rampa trapezoidal calculada só com inteiros (AVR446).
+
+HOME: o Z sobe 10 mm, X e Y vão aos endstops, e só então o Z desce até o
+seu endstop. HOME com Z sempre referencia X junto, para o Z descer com o
+carro na zona morta, fora da mesa. Cada eixo: aproximação rápida, recuo
+e reaproximação lenta, como no teste_motores.
+
+Critério: os botões da aba de comandos manuais do slicer movem a máquina.
+
+Validado na máquina em 26/10/2026, pela aba de comandos manuais do slicer:
+HOME dos três eixos, JOG e MOVE em X, Y e Z, CANCEL com rampa, ESTOP com
+bloqueio de movimento até o CLEAR_FAULT. JOG de 100 mm em X e Y mede 100 mm
+(80 passos/mm e polia de 20 dentes confirmados).
 
 ### Em aberto
 
-- Passos/mm de X e Y (80, supondo polia de 20 dentes): confirmar medindo.
 - Passos/mm, VMAX e ACCEL do Z: dependem do fuso.
 - `MAX_COLS = 8192` não cobre 200 mm com pitch 1 a 80 passos/mm (16 000
   colunas): decidir entre pitch ≥ 2 e mudar o protocolo, ao chegar nas swaths.

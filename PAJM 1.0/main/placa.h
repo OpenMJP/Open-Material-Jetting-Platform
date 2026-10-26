@@ -11,6 +11,11 @@ void placa_iniciar(void);
 // Usado pelo ESTOP (seção 7.8).
 void placa_estado_seguro(void);
 
+// Liga os drivers dos motores (MOTOR_EN em 0). Devolve true se eles estavam
+// desligados, para quem chama esperar antes do primeiro passo. Pode ser
+// chamada dentro de seção crítica.
+bool placa_motores_ligar(void);
+
 // Desliga só o VPP (rotina de desligamento, seção 7.7).
 void placa_vpp_desligar(void);
 bool placa_vpp_ligado(void);

@@ -12,3 +12,7 @@ CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
 
 # Tick de 1 ms, para as esperas curtas do laço de comunicação
 CONFIG_FREERTOS_HZ=1000
+
+# ISR do gerador de passos em IRAM: não para durante gravação na flash (NVS)
+CONFIG_GPTIMER_ISR_CACHE_SAFE=y
+CONFIG_GPTIMER_CTRL_FUNC_IN_IRAM=y

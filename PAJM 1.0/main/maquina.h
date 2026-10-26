@@ -40,3 +40,27 @@
 #define VMAX_Y_INICIAL   MM_PARA_PASSOS(100,  PASSOS_POR_M_Y)
 #define VMAX_Z_INICIAL   MM_PARA_PASSOS(5,    PASSOS_POR_M_Z)  // [EM ABERTO]
 #define RUNUP_MARGIN_INICIAL  MM_PARA_PASSOS(1, PASSOS_POR_M_X) // 1 mm
+
+// Sentido: nos três eixos o negativo vai para o endstop com o pino DIR em 1
+// (conferido no teste_motores). Trocar aqui se um motor for religado ao contrário.
+#define DIR_NEGATIVO_X  1
+#define DIR_NEGATIVO_Y  1
+#define DIR_NEGATIVO_Z  1
+
+// HOME (mesma lógica do teste_motores: aproximação rápida, recuo,
+// reaproximação lenta). Velocidade constante, sem rampa.
+#define HOME_RAPIDO_XY_MM_S  20
+#define HOME_LENTO_XY_MM_S   3
+#define HOME_RECUO_XY_MM     5
+#define HOME_RAPIDO_Z_MM_S   5
+#define HOME_LENTO_Z_MM_S    1
+#define HOME_RECUO_Z_MM      2
+
+// Antes de X e Y andarem no HOME, o Z sobe isto. O Z só desce até o endstop
+// com o carro na zona morta de X, fora da mesa: por isso HOME com Z também
+// referencia X, que termina em 0.
+#define HOME_SUBIDA_Z_MM     10
+
+// Abaixo disto (perto do endstop), um endstop acionado fora de HOME e JOG
+// não é tratado como falha: no 0 a chave está no limiar de acionamento.
+#define MARGEM_ENDSTOP_MM    1

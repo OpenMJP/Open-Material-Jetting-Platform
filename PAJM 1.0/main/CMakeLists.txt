@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "app_main.c"
+    SRCS "movimento.c" "app_main.c"
          "placa.c"
          "crc.c"
          "quadro.c"

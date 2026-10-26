@@ -3,7 +3,7 @@
 // Fronteira de responsabilidade: o PC não faz timing; o firmware não faz
 // geometria. O firmware valida, move e dispara. Contrato: PROTOCOL.md v1.1.
 //
-// Núcleo 0: comunicação e, na etapa 2, movimento.
+// Núcleo 0: comunicação (prioridade 10) e movimento (12).
 // Núcleo 1: reservado à interface com o Xaar.
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -13,6 +13,7 @@
 #include "autoteste.h"
 #include "crc.h"
 #include "enlace.h"
+#include "movimento.h"
 #include "parametros.h"
 #include "placa.h"
 #include "protocolo.h"
@@ -59,6 +60,7 @@ void app_main(void)
     }
 
     enlace_iniciar();
+    movimento_iniciar();
     sessao_iniciar(ok);
 
     ESP_LOGI(TAG, "firmware %d.%d.%d, protocolo %d.%d, UART0 a %d baud",

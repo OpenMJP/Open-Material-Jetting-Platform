@@ -1,8 +1,8 @@
 // sessao.c - máquina de estados do protocolo, lado do ESP
 //
 // Tudo aqui roda na tarefa de comunicação, então o estado não precisa de
-// trava. Quando o movimento entrar (etapa 2), a posição e o fim dos
-// comandos virão de outra tarefa e esta fronteira ganha sincronização.
+// trava. A posição real, a referência e a fila pertencem ao movimento.c,
+// que roda em outra tarefa; a conversa com ele é só pela interface dele.
 //
 // Referência executável do comportamento esperado:
 // SLICER 1.0/pajm/machine/simulador_v11.py
@@ -10,6 +10,7 @@
 #include "esp_timer.h"
 #include "sessao.h"
 #include "enlace.h"
+#include "movimento.h"
 #include "parametros.h"
 #include "placa.h"
 #include "protocolo.h"
@@ -33,14 +34,23 @@ static struct {
     uint8_t last_error;
     uint16_t job_id;
     uint16_t swath_id;
-    uint8_t referenciados;      // bits 0-2 = X, Y, Z
-    int32_t pos[3];
 } m;
+
+// Estado planejado (seção 7.1): como a máquina vai estar depois de executar
+// tudo o que já está na fila. As validações olham para ele, não para o
+// estado real. Ressincroniza com o real sempre que a fila esvazia.
+static struct {
+    uint8_t referenciados;
+    int32_t pos[3];
+} plano;
+
+static const int32_t CURSO[3] = { CURSO_X, CURSO_Y, CURSO_Z };
+static const uint16_t PARAM_VMAX[3] = { PARAM_VMAX_X, PARAM_VMAX_Y, PARAM_VMAX_Z };
 
 // ---- envio --------------------------------------------------------------
 
 static uint8_t swath_livres(void) { return SWATH_SLOTS; }
-static uint8_t fila_livres(void) { return QUEUE_SLOTS; }
+static uint8_t fila_livres(void) { return movimento_fila_livre(); }
 
 static void enviar_ack(uint8_t seq)
 {
@@ -83,7 +93,7 @@ static void enviar_hello_ack(void)
 
 static void enviar_status(void)
 {
-    uint8_t flags = m.referenciados & 0x07;
+    uint8_t flags = movimento_referenciados() & 0x07;
     if (placa_vpp_ligado()) {
         flags |= FLAG_VPP;
     }
@@ -96,9 +106,9 @@ static void enviar_status(void)
     put_u16(p + 4, m.swath_id);
     p[6] = swath_livres();
     p[7] = fila_livres();
-    put_i32(p + 8, m.pos[0]);
-    put_i32(p + 12, m.pos[1]);
-    put_i32(p + 16, m.pos[2]);
+    put_i32(p + 8, movimento_posicao(0));
+    put_i32(p + 12, movimento_posicao(1));
+    put_i32(p + 16, movimento_posicao(2));
     p[20] = m.last_error;
     p[21] = m.fault;
     put_u16(p + 22, enlace_descartados());
@@ -107,31 +117,40 @@ static void enviar_status(void)
 
 // ---- ações --------------------------------------------------------------
 
-// Rotina de desligamento (seção 7.7). Na etapa 1 não há fila nem
-// movimento, então ela termina na hora e o STOPPING não chega a aparecer.
+// Rotina de desligamento (seção 7.7). A rampa de parada corre na tarefa de
+// movimento; a sessão não espera por ela, então o STOPPING ainda não aparece.
 static void desligar(uint8_t motivo)
 {
     placa_vpp_desligar();
+    movimento_cancelar();
     m.estado = EST_IDLE;
     m.last_error = motivo;
 }
 
-// Seção 7.8
-static void estop(void)
+// ESTOP (seção 7.8) e falhas: corte sem rampa, drivers desligados, eixos
+// sem referência.
+static void falhar(uint8_t codigo)
 {
+    movimento_parar_ja();
     placa_estado_seguro();
-    m.referenciados = 0;
+    plano.referenciados = 0;
     m.estado = EST_FAULT;
-    m.fault = FALHA_ESTOP;
-    ESP_LOGW(TAG, "ESTOP");
+    m.fault = codigo;
+    ESP_LOGW(TAG, "FAULT 0x%02x", codigo);
 }
 
 static void cancelar(void)
 {
     if (m.estado == EST_JOB) {
         desligar(ERR_CANCELLED);
+    } else if (m.estado == EST_IDLE) {
+        movimento_cancelar();
     }
-    // Em IDLE: parar o movimento com rampa e esvaziar a fila (etapa 2)
+}
+
+static uint8_t enfileirar(comando_t c)
+{
+    return movimento_enfileirar(c) ? ERR_OK : ERR_NO_QUEUE_SLOT;
 }
 
 // ---- tratamento por opcode ----------------------------------------------
@@ -195,15 +214,14 @@ static uint8_t despachar(uint8_t op, const uint8_t *p, int32_t *det)
             *det = m.estado;
             return ERR_BAD_STATE;
         }
-        // Os drivers continuam desligados; o HOME da etapa 2 os religa.
+        // Os eixos já perderam a referência ao entrar em FAULT. Os drivers
+        // continuam desligados até o próximo movimento.
         m.estado = EST_IDLE;
         m.fault = 0;
-        m.referenciados = 0;
         return ERR_OK;
 
     case OP_SET_PARAM:
-        // Aceito em IDLE com a fila vazia (a fila ainda não existe)
-        if (m.estado != EST_IDLE) {
+        if (m.estado != EST_IDLE || !movimento_ocioso()) {
             *det = m.estado;
             return ERR_BAD_STATE;
         }
@@ -234,8 +252,94 @@ static uint8_t despachar(uint8_t op, const uint8_t *p, int32_t *det)
         }
         return ERR_OK;
 
+    case OP_HOME: {
+        uint8_t mascara = p[0];
+        if (mascara & ~0x07) {
+            *det = 0;
+            return ERR_BAD_PARAM;
+        }
+        uint8_t codigo = enfileirar((comando_t){ .tipo = CMD_HOME, .eixo = mascara });
+        if (codigo == ERR_OK) {
+            if (mascara & 0x04) {
+                mascara |= 0x01;            // HOME com Z também referencia X
+            } else if (mascara && (plano.referenciados & 0x04)) {
+                // o Z sobe antes de X e Y andarem e fica lá em cima
+                int32_t z = plano.pos[2] + MM_PARA_PASSOS(HOME_SUBIDA_Z_MM, PASSOS_POR_M_Z);
+                plano.pos[2] = z < CURSO_Z ? z : CURSO_Z;
+            }
+            for (int e = 0; e < 3; e++) {
+                if (mascara & (1 << e)) {
+                    plano.referenciados |= 1 << e;
+                    plano.pos[e] = 0;
+                }
+            }
+        }
+        return codigo;
+    }
+
+    case OP_MOVE: {
+        uint8_t e = p[0];
+        int32_t pos = get_i32(p + 4);
+        uint32_t vel = get_u32(p + 8);
+        if (e > 2) {
+            *det = 0;
+            return ERR_BAD_PARAM;
+        }
+        if (!(plano.referenciados & (1 << e))) {
+            *det = 1 << e;
+            return ERR_NOT_HOMED;
+        }
+        if (pos < 0 || pos > CURSO[e]) {
+            *det = pos;
+            return ERR_OUT_OF_TRAVEL;
+        }
+        if (vel == 0 || vel > (uint32_t)parametro(PARAM_VMAX[e])) {
+            *det = 8;
+            return ERR_BAD_PARAM;
+        }
+        uint8_t codigo = enfileirar((comando_t){ .tipo = CMD_MOVE, .eixo = e,
+                                                 .valor = pos, .vel = vel });
+        if (codigo == ERR_OK) {
+            plano.pos[e] = pos;
+        }
+        return codigo;
+    }
+
+    case OP_JOG: {
+        if (m.estado != EST_IDLE) {
+            *det = m.estado;
+            return ERR_BAD_STATE;
+        }
+        uint8_t e = p[0];
+        int32_t delta = get_i32(p + 4);
+        uint32_t vel = get_u32(p + 8);
+        if (e > 2) {
+            *det = 0;
+            return ERR_BAD_PARAM;
+        }
+        if (vel == 0 || vel > (uint32_t)parametro(PARAM_VMAX[e])) {
+            *det = 8;
+            return ERR_BAD_PARAM;
+        }
+        int32_t destino = plano.pos[e] + delta;
+        bool ref = plano.referenciados & (1 << e);
+        if (ref && (destino < 0 || destino > CURSO[e])) {
+            *det = destino;
+            return ERR_OUT_OF_TRAVEL;
+        }
+        uint8_t codigo = enfileirar((comando_t){ .tipo = CMD_JOG, .eixo = e,
+                                                 .valor = delta, .vel = vel });
+        if (codigo == ERR_OK) {
+            plano.pos[e] = destino;
+        }
+        return codigo;
+    }
+
+    case OP_DWELL:
+        return enfileirar((comando_t){ .tipo = CMD_DWELL, .valor = (int32_t)get_u32(p) });
+
     default:
-        // Conhecido pelo protocolo, mas ainda não implementado nesta etapa
+        // Conhecido pelo protocolo, mas ainda não implementado
         *det = op;
         return ERR_UNKNOWN_OPCODE;
     }
@@ -303,7 +407,7 @@ void sessao_receber(const quadro_t *q, void *ctx)
     // Prioritários: fora da janela, seq ignorado, sem ACK (seção 4.1).
     // O ESTOP é atendido mesmo sem sessão: parar nunca deve depender dela.
     if (q->tipo == OP_ESTOP) {
-        estop();
+        falhar(FALHA_ESTOP);
         s.t_ultimo_rx_us = agora;
         return;
     }
@@ -339,6 +443,17 @@ void sessao_receber(const quadro_t *q, void *ctx)
 
 void sessao_periodico(int64_t agora)
 {
+    uint8_t f = movimento_falha_pendente();
+    if (f && m.estado != EST_FAULT) {
+        falhar(f);
+    }
+    if (movimento_ocioso()) {
+        plano.referenciados = movimento_referenciados();
+        for (int e = 0; e < 3; e++) {
+            plano.pos[e] = movimento_posicao(e);
+        }
+    }
+
     if (!s.ativa) {
         return;
     }
@@ -347,8 +462,9 @@ void sessao_periodico(int64_t agora)
         s.ativa = false;
         if (m.estado == EST_JOB) {
             desligar(ERR_LINK_LOST);
+        } else if (m.estado == EST_IDLE) {
+            movimento_cancelar();           // movimento manual: para com rampa
         }
-        // Movimento manual em curso: parar com rampa (etapa 2)
         ESP_LOGW(TAG, "enlace perdido, sessão encerrada");
         return;
     }
