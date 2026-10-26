@@ -1,0 +1,42 @@
+// maquina.h - constantes mecânicas da máquina
+//
+// Na v1.x do protocolo, passos por metro e curso são constantes de
+// compilação, informadas ao PC no HELLO_ACK (PROTOCOL.md, seção 8.2). O PC
+// não tem nenhum desses valores fixos: tudo o que ele sabe da mecânica vem
+// daqui. Valor errado aqui = peça com escala errada, sem nenhum aviso.
+#pragma once
+
+// X e Y: A4988 a 1/16 (200 x 16 = 3200 passos/volta), correia GT2 com polia
+// de 20 dentes (40 mm/volta) -> 80 passos/mm.
+// [VERIFICAR] a polia: mandar um JOG de 8000 passos e medir 100 mm.
+#define PASSOS_POR_M_X  80000
+#define PASSOS_POR_M_Y  80000
+
+// Z: [EM ABERTO], depende do fuso. Provisório: fuso T8 (8 mm/volta) a 1/16,
+// 400 passos/mm. Com barra roscada M5 (0,8 mm/volta) seriam 4000 passos/mm.
+#define PASSOS_POR_M_Z  400000
+
+#define MM_PARA_PASSOS(mm, passos_por_m)  ((int32_t)((mm) * (passos_por_m) / 1000))
+
+// Curso total de cada eixo, em passos, com 0 no endstop (seção 6). O
+// firmware aceita qualquer posição em [0, curso], inclusive as zonas mortas
+// fora da mesa: é ali que o X acelera e freia nas swaths. Onde fica a mesa
+// dentro do curso é assunto do slicer.
+//   X: 245 mm (zonas mortas de ~35 mm de cada lado)
+//   Y: 230 mm (35 mm a partir do zero, 15 mm antes do fim)
+//   Z: 200 mm; endstop embaixo, com o bico a 1 mm da mesa no zero
+#define CURSO_X  MM_PARA_PASSOS(245, PASSOS_POR_M_X)
+#define CURSO_Y  MM_PARA_PASSOS(230, PASSOS_POR_M_Y)
+#define CURSO_Z  MM_PARA_PASSOS(200, PASSOS_POR_M_Z)
+
+// Valores iniciais dos parâmetros da seção 8.2, convertidos para os passos
+// acima. São pontos de partida: calibrar e ajustar com SET_PARAM.
+#define ACCEL_X_INICIAL  MM_PARA_PASSOS(1000, PASSOS_POR_M_X)  // 1000 mm/s²
+#define ACCEL_Y_INICIAL  MM_PARA_PASSOS(500,  PASSOS_POR_M_Y)  //  500 mm/s²
+#define ACCEL_Z_INICIAL  MM_PARA_PASSOS(50,   PASSOS_POR_M_Z)  //   50 mm/s² [EM ABERTO]
+// 150 mm/s em X = 12 kHz, o maior valor já exercitado no teste_motores.
+// A seção 8.2 sugere 200 mm/s; subir depois de calibrar.
+#define VMAX_X_INICIAL   MM_PARA_PASSOS(150,  PASSOS_POR_M_X)
+#define VMAX_Y_INICIAL   MM_PARA_PASSOS(100,  PASSOS_POR_M_Y)
+#define VMAX_Z_INICIAL   MM_PARA_PASSOS(5,    PASSOS_POR_M_Z)  // [EM ABERTO]
+#define RUNUP_MARGIN_INICIAL  MM_PARA_PASSOS(1, PASSOS_POR_M_X) // 1 mm

@@ -1,0 +1,14 @@
+CONFIG_IDF_TARGET="esp32s3"
+
+# YD-ESP32-S3 N16R8: 16 MB de flash, 8 MB de PSRAM octal
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+
+# Console na USB nativa. A UART0 fica exclusiva para o protocolo
+# (PROTOCOL.md, seção 2): nenhum log pode sair por ela depois do boot.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+# Tick de 1 ms, para as esperas curtas do laço de comunicação
+CONFIG_FREERTOS_HZ=1000
