@@ -6,8 +6,12 @@ Plataforma aberta de controle e posicionamento de um cabeçote industrial de jat
 
 Trabalho de Conclusão de Curso de Engenharia Mecatrônica na **UTFPR, Campus Curitiba**, desenvolvido no **NUFER** (Núcleo de Manufatura Aditiva e Ferramental).
 
-- **Autores:** Arthur Benatto Celestino e Gabriela Kemper de Souza
+- **Autores:** Arthur Benatto Celestino (firmware e eletrônica) e Gabriela Kemper de Souza (programa de controle e mecânica)
 - **Orientação:** Prof. Dr. Neri Volpato
+
+<!-- FOTO: coloque aqui uma foto da máquina ou do cabeçote jateando, por exemplo:
+![Máquina PAJM](docs/img/maquina.jpg)
+-->
 
 ---
 
@@ -24,10 +28,17 @@ Trabalho de Conclusão de Curso de Engenharia Mecatrônica na **UTFPR, Campus Cu
 | Parte | Escolha |
 |---|---|
 | Cabeçote | Xaar XJ128/360: 128 bicos, gota de 40 pL, 360 × 360 dpi montado a 31°, faixa de 9 mm |
-| Controlador | ESP32-S3 (YD-ESP32-S3 N16R8), com ESP-IDF 5.5.5 |
+| Controlador | ESP32-S3 (YD-ESP32-S3 N16R8), com ESP-IDF 5.5.5: um núcleo cuida dos motores e da comunicação, o outro só do cabeçote |
+| Eletrônica | Placa própria no KiCad, com buffers 74HCT244 para os sinais do cabeçote |
 | Comunicação | USB serial pelo CH343P, a 2 Mbaud |
 | Mecânica | Cartesiana (base de Prusa i3), NEMA 17 com drivers A4988, mesa de 200 × 200 mm |
 | Segurança | Watchdog externo que corta a alta tensão do cabeçote se o firmware parar |
+
+## Estado do projeto
+
+O sistema está montado, integrado e testado com o cabeçote, imprimindo imagens, padrões de calibração e peças fatiadas em camadas sobrepostas. O disparo é sincronizado com a posição do carro pela contagem de passos do motor, sem encoder. Medido com analisador lógico, o atraso entre o passo do motor e o disparo é de cerca de 4,2 µs, com variação de 190 ns.
+
+Ficaram para depois do TCC a impressão nos dois sentidos de movimento, o uso de mais de um cabeçote e a construção de peças por camadas com cura entre elas.
 
 ## Estrutura do repositório
 
