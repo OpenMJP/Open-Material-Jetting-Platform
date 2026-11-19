@@ -1,5 +1,5 @@
 """
-Sessao e transporte do protocolo PAJM v1.1, lado do PC.
+Sessao e transporte do protocolo PAJM (PROTOCOL.md), lado do PC.
 
 Implementa as camadas 4 e 5 do PROTOCOL.md: janela Go-Back-N com ACK
 cumulativo e retransmissao, creditos de swath e de fila, abertura de sessao

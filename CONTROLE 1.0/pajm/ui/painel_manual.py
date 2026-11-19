@@ -65,7 +65,7 @@ class PainelManual(QWidget):
         self.bt_atualizar.setMaximumWidth(34)
         self.bt_atualizar.clicked.connect(self._listar_portas)
         self.cb_baud = QComboBox()
-        # A secao 2 preve cair para 921600 se 2 Mbaud nao passar no bring-up.
+        # A secao 2 preve 921600 como alternativa aos 2 Mbaud.
         for b in (pv.BAUD, pv.BAUD_ALTERNATIVO):
             self.cb_baud.addItem(f"{b} baud", b)
         self.bt_conectar = primario(QPushButton("Conectar"))

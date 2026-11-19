@@ -1,13 +1,8 @@
 """
-Protocolo PAJM v1.1, lado do PC.
+Protocolo PAJM, lado do PC.
 
-Implementa `Firmware_Software/PROTOCOL.md` versao 1.1, que e o contrato
-fechado entre o software de controle e o firmware do ESP32-S3.
-
-Este modulo substitui `protocolo.py`, que era uma proposta escrita pelo lado
-do software quando ainda nao havia documento do outro lado. O que sobreviveu
-daquela proposta foi so o formato da coluna de 16 bytes, que por sorte ja
-estava certo: a secao 6.1 do PROTOCOL.md descreve exatamente a mesma ordem.
+Implementa o `PROTOCOL.md` (versao em PROTO_MAJOR e PROTO_MINOR, abaixo), que
+e o contrato entre o programa de controle e o firmware do ESP32-S3.
 
 ESCOPO DESTE ARQUIVO
 Apenas enlace e apresentacao: enquadramento COBS, CRC, e a montagem e leitura
@@ -27,7 +22,7 @@ from enum import IntEnum
 # --------------------------------------------------------------------------
 
 BAUD = 2_000_000
-BAUD_ALTERNATIVO = 921_600          # fallback se 2 Mbaud nao passar no bring-up
+BAUD_ALTERNATIVO = 921_600          # alternativa prevista na secao 2
 
 MAX_PAYLOAD = 1028                  # SWATH_DATA com 64 colunas
 MAIOR_QUADRO_NO_FIO = 1038          # COBS + delimitador

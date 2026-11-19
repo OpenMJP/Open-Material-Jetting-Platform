@@ -1,5 +1,5 @@
 """
-Porta serial para o protocolo v1.1.
+Porta serial para o protocolo PAJM.
 
 O ESP fala por UART0 atraves de um CH343P a 2 Mbaud, 8N1, sem controle de
 fluxo por hardware (PROTOCOL.md secao 2).

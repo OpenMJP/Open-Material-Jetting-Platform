@@ -125,7 +125,7 @@ Por isso a resolução é **declarada** no arquivo (`pixel_mm`), e não imposta:
 - **Se `pixel_mm` bate com a grade da máquina** (diferença menor que 0,5% em cada eixo), as imagens são usadas como estão, pixel a pixel.
 - **Se não bate**, o PAJM Controle reamostra cada camada para a grade da máquina e avisa o operador. A reamostragem é por área: um ponto da grade nova é jateado se mais da metade da sua área cai em pixels pretos. Um arquivo reamostrado imprime certo em escala, mas pode perder detalhes menores que um pixel.
 
-Para gerar já na grade nativa, sem reamostragem, o PAJM Controle exporta o **perfil da máquina** (botão "Exportar perfil para CAM"). O perfil é um JSON:
+Para gerar já na grade nativa, sem reamostragem, o PAJM Controle exporta o **perfil da máquina** (página Arquivos, botão "Exportar perfil da maquina..."). O perfil é um JSON:
 
 ```json
 {
@@ -179,4 +179,4 @@ E avisa, sem recusar, quando:
 
 ## 8. Exemplo de referência
 
-O fatiador do próprio PAJM Controle exporta qualquer peça fatiada neste formato (botão "Exportar .pajm"). O arquivo gerado serve de exemplo para quem implementa o lado do RP3, e de teste: exportar e importar de volta tem de dar as mesmas camadas.
+O fatiador do próprio PAJM Controle exporta qualquer peça fatiada neste formato (botão "Exportar camadas como .pajm..."). O arquivo gerado serve de exemplo para quem implementa o lado do RP3, e de teste: exportar e importar de volta tem de dar as mesmas camadas.

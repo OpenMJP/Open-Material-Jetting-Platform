@@ -81,7 +81,7 @@ checa("desconectado: indicador amarelo e PARAR desabilitado",
       and not barra.bt_parar.isEnabled())
 
 print()
-print("2. MESA (item 3)")
+print("2. MESA")
 pend = janela.aba_pend
 checa("presets de mesa oferecidos",
       pend.cb_mesa.count() == len(MESAS) + 1, f"{pend.cb_mesa.count()} itens")
@@ -93,7 +93,7 @@ checa("escolher preset preenche o curso",
       f"{perfil.movimento.curso_x_mm} x {perfil.movimento.curso_y_mm}")
 
 print()
-print("3. MICROPASSOS E DPI (item 2)")
+print("3. MICROPASSOS E DPI")
 fat = janela.aba_fatiar
 perfil.movimento.passos_por_mm_x = None
 d = fat._dpi_x()
@@ -188,7 +188,7 @@ checa("zerar giro",
       all(fat.sp[c].value() == 0.0 for c in ("rx", "ry", "rz")))
 
 print()
-print("4. FATIAMENTO E CHAPAS (item 1)")
+print("4. FATIAMENTO E CHAPAS")
 peca = trimesh.creation.box(extents=[18, 12, 6])
 fat.malha_original = peca
 fat._relatorio = cmalha.validar(peca)
@@ -291,7 +291,7 @@ checa("modo lado a lado: uma unidade por chapa",
 checa("todas as chapas no mesmo Z",
       {u.z_mm for u in u_lado} == {0.0})
 
-# ESTE e o ponto do pedido: o dado do cabecote tem que ser o das chapas.
+# O dado do cabecote tem que ser o das chapas, nao so a previa.
 f_peca = cenv.contar_swaths(u_peca, perfil.cabecote.n_bicos)
 f_lado = cenv.contar_swaths(u_lado, perfil.cabecote.n_bicos)
 checa("o job muda com o modo, nao so a previa",
@@ -320,7 +320,7 @@ for modo in ("peca", "lado"):
               if fat.previa._img else "")
 
 print()
-print("5b. ENVIO PARA A MAQUINA (protocolo v1.1)")
+print("5b. ENVIO PARA A MAQUINA")
 from pajm.core import envio as cenv11
 from pajm.machine import protocolo as pvv
 from pajm.machine.sessao import Evento as EvV11
@@ -332,7 +332,7 @@ pm0 = janela.aba_manual
 pm0.cb_porta.setCurrentIndex(0)
 pm0.conectar()
 app.processEvents()
-checa("conectou ao simulador v1.1",
+checa("conectou ao simulador",
       pm0.sessao is not None and pm0.sessao.aberta)
 checa("o HELLO_ACK preencheu passos por mm no perfil",
       perfil.movimento.passos_por_mm_x == 40.0,
@@ -529,7 +529,7 @@ pm1.desconectar()
 app.processEvents()
 
 print()
-print("6. PADROES (item 5)")
+print("6. PADROES")
 pp = janela.aba_padroes
 pp.gerar_bicos()
 app.processEvents()
@@ -615,7 +615,7 @@ checa("linhas verticais geradas",
       pp.padrao.bitmap.shape[0] == 128 * pp.sp_l_faixas.value())
 
 print()
-print("7. MODO SIMULADO (item 4)")
+print("7. MODO SIMULADO")
 pm = janela.aba_manual
 checa("simulador oferecido como porta", pm.cb_porta.itemData(0) == "sim")
 pm.cb_porta.setCurrentIndex(0)
@@ -823,7 +823,7 @@ checa("colunas de controles ficam em area rolavel",
       "todas as paginas")
 
 print()
-print("9. PENTE FINO (03/11)")
+print("9. ORIENTACAO, DIALOGOS, CONTORNO, ORIGEM E RESOLUCAO")
 # Previa com Y para cima: a linha 0 do bitmap (Y menor) desenhada embaixo
 from pajm.ui.preview2d import PreviaCamada as _Pv
 from pajm.core.fatiador import GradeRaster as _GR

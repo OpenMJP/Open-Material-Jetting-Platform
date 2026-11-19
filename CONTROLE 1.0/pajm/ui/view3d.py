@@ -1,7 +1,7 @@
 """
 Vista 3D da plataforma com o modelo.
 
-O PC do laboratorio ainda nao foi levantado e pode ter GPU integrada antiga.
+O PC pode ter uma GPU integrada antiga, sem o OpenGL que a vista precisa.
 Se o OpenGL nao subir, o widget cai para uma vista 2D de topo em vez de
 derrubar o programa -- perder a vista 3D e aceitavel, nao abrir nao e.
 """

@@ -49,8 +49,6 @@ Ficaram para depois do TCC a impressão nos dois sentidos de movimento, o uso de
 | [`PROTOCOL.md`](PROTOCOL.md) | Protocolo PC ↔ firmware (v1.4): quadros, sessão, swaths, códigos de erro |
 | [`IMPORTACAO.md`](IMPORTACAO.md) | Formato `.pajm` para importar camadas de outro programa de planejamento de processo |
 | [`CONTEXTO-PAJM.md`](CONTEXTO-PAJM.md) | Cabeçote, hardware, geometria, decisões de projeto e estado atual |
-| [`SOFTWARE-PARA-O-FIRMWARE.md`](SOFTWARE-PARA-O-FIRMWARE.md) | O que o firmware precisa saber do lado do PC |
-| [`CHECKLIST-PRIMEIRO-TESTE.md`](CHECKLIST-PRIMEIRO-TESTE.md) | Roteiro da primeira ligação da placa |
 
 A divisão de responsabilidades é estrita: **o PC não faz timing, o firmware não faz geometria.** O PC fatia, rasteriza e compensa a inclinação do cabeçote. O firmware recebe colunas prontas e dispara cada uma na posição certa do eixo X.
 

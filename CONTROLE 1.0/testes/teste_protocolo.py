@@ -1,5 +1,5 @@
 """
-Conformidade com PROTOCOL.md v1.1.
+Conformidade com o PROTOCOL.md (vetores da secao 10).
 
 A secao 10 do documento publica vetores de teste gerados por implementacao de
 referencia, e exige que as implementacoes em C e em Python os reproduzam byte

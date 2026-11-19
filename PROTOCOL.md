@@ -1,6 +1,6 @@
 # PAJM: Protocolo de comunicação PC ↔ ESP32-S3
 
-Versão **1.4** · 29/10/2026 · Status: fechado para implementação (os itens da seção 11 dependem de validação no bring-up)
+Versão **1.4** · 29/10/2026 · Status: implementado no firmware e no programa de controle, em uso na máquina (validação na seção 11)
 
 Este documento é o contrato entre o software de controle (PC, Python) e o firmware (ESP32-S3, ESP-IDF 5.5.5). Toda mudança no protocolo começa aqui, antes do código, e altera a versão conforme a seção 12.
 
@@ -26,7 +26,7 @@ Princípio de divisão de trabalho: o PC faz todo o processamento de imagem (inc
 
 ## 2. Camada física
 
-A comunicação usa a UART0 do ESP (GPIO43 TX, GPIO44 RX), ligada ao CH343P, a **2 000 000 baud, 8N1**, sem controle de fluxo por hardware. As linhas DTR/RTS do CH343P vão ao circuito de auto-reset, não a controle de fluxo. A vazão nominal é de ~200 KB/s. Se 2 Mbaud não passar no teste da seção 11, os dois lados passam para 921 600 baud. A taxa é fixa, sem negociação.
+A comunicação usa a UART0 do ESP (GPIO43 TX, GPIO44 RX), ligada ao CH343P, a **2 000 000 baud, 8N1**, sem controle de fluxo por hardware. As linhas DTR/RTS do CH343P vão ao circuito de auto-reset, não a controle de fluxo. A vazão nominal é de ~200 KB/s. Os 2 Mbaud foram validados na máquina (seção 11); 921 600 baud fica previsto como alternativa, nos dois lados. A taxa é fixa, sem negociação.
 
 O console do ESP-IDF DEVE sair pela porta USB nativa (`CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y`, GPIO19/20). Depois do boot, nenhum log pode sair pela UART0, porque ele corromperia o fluxo binário. Durante o desenvolvimento usam-se dois cabos: o do CH343P para o protocolo e o da USB nativa para `idf.py monitor`.
 
@@ -621,18 +621,18 @@ O CRC-32 dessa swath de uma coluna (para o SWATH_END) é `0xC7419637`.
 
 ---
 
-## 11. A validar no bring-up
+## 11. Validação na máquina
 
-| Item | Critério |
-|---|---|
-| 2 Mbaud pelo CH343P | 1 MB transmitido com `frames_dropped = 0`; se falhar, adotar 921 600 baud |
-| Vazão sustentada PC → ESP com janela 8 | ≥ 100 KB/s |
-| DTR/RTS no Windows com o driver do CH343 | abrir a porta não reseta o ESP |
-| Latência do ESTOP | medir com o LA1010 entre a borda final do quadro em GPIO44 e o r_vpp (GPIO13); meta < 50 ms |
-| MIN_FIRE_PERIOD | testar o cabeçote real (READY) entre 200 µs e o limite de 180 µs do manual |
-| Grade de disparo | comparar pitch 3 e pitch 1 com o padrão de linhas verticais, escaneado |
-| Ordem do HOME | definir conforme a posição do endstop de Z (se ele fica embaixo, Z sobe antes de X e Y) |
-| ACCEL/VMAX por eixo | definidos em 03/11/2026 (§8.2); conferir na máquina que X e Y não perdem passo a 250 mm/s |
+| Item | Critério | Situação |
+|---|---|---|
+| 2 Mbaud pelo CH343P | `frames_dropped = 0` | validado em 26/10/2026; 921 600 baud fica como alternativa |
+| Vazão sustentada PC → ESP com janela 8 | ≥ 100 KB/s | não medida isoladamente |
+| DTR/RTS no Windows com o driver do CH343 | abrir a porta não reseta o ESP | não medido; o PC tolera um reset na abertura (§5.1) |
+| Latência do ESTOP | da borda final do quadro em GPIO44 ao r_vpp (GPIO13), meta < 50 ms | não medida |
+| MIN_FIRE_PERIOD | cabeçote real com o READY | 200 µs validado em 27/10/2026 (SPIT de 1000 pulsos); o limite de 180 µs do manual não foi testado |
+| Grade de disparo | pitch | definida: pitch = micropassos por disparo, 6 por padrão (339 dpi a 80 passos/mm) |
+| Ordem do HOME | endstop de Z embaixo | implementada: Z sobe 10 mm, X e Y referenciam, e o Z desce com o carro na zona morta |
+| ACCEL/VMAX por eixo | §8.2 | definidos em 03/11/2026; falta conferir que X e Y não perdem passo a 250 mm/s |
 
 ---
 

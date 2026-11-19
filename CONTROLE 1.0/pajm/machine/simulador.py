@@ -1,5 +1,5 @@
 """
-Firmware simulado falando PROTOCOL.md v1.1.
+Firmware simulado falando o PROTOCOL.md.
 
 Implementa o lado do ESP32-S3 no mesmo processo, falando os MESMOS BYTES que
 a maquina real falaria. Nao e um stub que responde sucesso: ele mantem a

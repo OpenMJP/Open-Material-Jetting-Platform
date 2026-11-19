@@ -1,5 +1,5 @@
 """
-Sessao e transporte v1.1 contra o firmware simulado.
+Sessao e transporte contra o firmware simulado.
 
 O relogio e falso: os testes avancam o tempo em vez de esperar, entao RTO,
 heartbeat e timeout de enlace sao verificados em milissegundos de execucao.

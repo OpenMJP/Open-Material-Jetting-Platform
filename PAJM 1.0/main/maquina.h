@@ -8,7 +8,7 @@
 
 // X e Y: A4988 a 1/16 (200 x 16 = 3200 passos/volta), correia GT2 com polia
 // de 20 dentes (40 mm/volta) -> 80 passos/mm.
-// [VERIFICAR] a polia: mandar um JOG de 8000 passos e medir 100 mm.
+// Medido em 26/10/2026: JOG de 100 mm em X e Y mede 100 mm.
 #define PASSOS_POR_M_X  80000
 #define PASSOS_POR_M_Y  80000
 
@@ -21,7 +21,7 @@
 // Curso total de cada eixo, em passos, com 0 no endstop (seção 6). O
 // firmware aceita qualquer posição em [0, curso], inclusive as zonas mortas
 // fora da mesa: é ali que o X acelera e freia nas swaths. Onde fica a mesa
-// dentro do curso é assunto do slicer.
+// dentro do curso é assunto do programa de controle.
 //   X: 245 mm (zonas mortas de ~35 mm de cada lado)
 //   Y: 230 mm (35 mm a partir do zero, 15 mm antes do fim)
 //   Z: 200 mm; endstop embaixo, com o bico a 1 mm da mesa no zero
@@ -65,8 +65,8 @@
 
 // Espera entre ligar o VPP e liberar o nRESET. O manual (seção 6.1.2) pede
 // no mínimo 100 ms e manda medir na aplicação o tempo de carga dos
-// capacitores do cabeçote. [VERIFICAR] no analisador: o VPP tem de estar
-// estável antes da subida do nRESET.
+// capacitores do cabeçote. 300 ms dão três vezes o mínimo; o tempo real de
+// carga não foi medido.
 #define VPP_ESTABILIZA_MS  300
 
 // Abaixo disto (perto do endstop), um endstop acionado fora de HOME e JOG

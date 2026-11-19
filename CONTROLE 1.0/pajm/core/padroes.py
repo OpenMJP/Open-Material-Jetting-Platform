@@ -163,8 +163,7 @@ def teste_de_alinhamento(dpi_x: float, dpi_y: float,
     diferente entre as duas metades. Quem calibra escolhe o par
     que nao mostra nem sobreposicao nem lacuna, e esse numero vira a correcao.
 
-    E o mesmo principio dos padroes de alinhamento de impressora de mesa, que
-    foi a referencia pedida.
+    E o mesmo principio dos padroes de alinhamento das impressoras de mesa.
 
     `eixo`:
       "x" varre o deslocamento ao longo da varredura. Serve para alinhar ida

@@ -18,3 +18,8 @@ CONTROLE 1.0/perfil_pajm.json
 # inicial (substituido pelo CONTEXTO-PAJM.md) e o protocolo descartado
 Contexto PAJM/
 _protocolo_v0_removido/
+
+# Arquivos de trabalho locais, fora do repositorio publicado
+PAJM.code-workspace
+CHECKLIST-PRIMEIRO-TESTE.md
+SOFTWARE-PARA-O-FIRMWARE.md

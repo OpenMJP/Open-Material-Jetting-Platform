@@ -1,5 +1,5 @@
 """
-Do bitmap fatiado ate os quadros do protocolo v1.1.
+Do bitmap fatiado ate os quadros do protocolo (PROTOCOL.md).
 
 Substitui `envio.py`, que falava a minha proposta antiga. As diferencas que
 obrigaram a reescrita:

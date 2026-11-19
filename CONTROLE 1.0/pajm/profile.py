@@ -71,7 +71,7 @@ MESAS: dict[str, tuple[float, float]] = {
     "Prusa Mini": (180.0, 180.0),
 }
 
-# Informado pela usuaria em 2026-10-06: a PAJM usa mesa de 200 x 200.
+# A PAJM usa a mesa de 200 x 200 mm da Prusa i3.
 MESA_PADRAO = "Prusa i3 e clones"
 
 
@@ -114,7 +114,7 @@ class Cabecote:
     # 180 us = 3 x 60 us  ->  taxa maxima de nFIRE = 5.56 kHz.
     tempo_ciclo_impressao_s: float = 180e-6
 
-    # Informado pela usuaria: o isolante do cabecote da PAJM e CINZA, o que
+    # O isolante do cabecote da PAJM e CINZA, o que
     # o coloca na familia /40 (cinza escuro = 128/40L, cinza claro =
     # 128/40W). As duas sao identicas em tudo que o fatiamento usa, entao a
     # familia basta. Falta so o revestimento da placa, que e operacional.
@@ -259,7 +259,7 @@ class Movimento:
     velocidade_max_mm_s: float | None = 250.0
     aceleracao_mm_s2: float | None = 1000.0
 
-    # Area util da mesa. Informada pela usuaria: Prusa i3 de 200 x 200.
+    # Area util da mesa: Prusa i3 de 200 x 200.
     # Z: 200 mm de curso medidos na maquina (firmware, maquina.h), com o
     # endstop embaixo e o bico a 1 mm da mesa no zero.
     curso_x_mm: float | None = 200.0
@@ -269,8 +269,9 @@ class Movimento:
 
     # Onde fica o (0, 0) da mesa dentro do curso da maquina, que tem 0 no
     # endstop. Medido em 26/10/2026: antes disso e zona morta, so para o
-    # eixo acelerar. As coordenadas do slicer sao da mesa; o envio soma isto.
-    # O protocolo (v1.2) nao informa o valor: candidato a uma versao futura.
+    # eixo acelerar. As coordenadas do fatiador sao da mesa; o envio soma
+    # isto. O protocolo nao informa o valor: ele fica no perfil, e e
+    # editavel na pagina Maquina.
     origem_mesa_x_mm: float = 35.0
     origem_mesa_y_mm: float = 35.0
 
@@ -328,7 +329,7 @@ class Perfil:
     movimento: Movimento = field(default_factory=Movimento)
     processo: Processo = field(default_factory=Processo)
 
-    # ---- fisica que amarra slicer e firmware -----------------------------
+    # ---- fisica que amarra fatiador e firmware ---------------------------
 
     def freq_disparo_hz(self, velocidade_mm_s: float, dpi_x: float) -> float:
         """f = v * dpi_x / 25.4. Velocidade e DPI em X nao sao livres: o

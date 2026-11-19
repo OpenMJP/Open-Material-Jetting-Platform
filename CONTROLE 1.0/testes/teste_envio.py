@@ -1,5 +1,5 @@
 """
-Ponta a ponta: STL -> fatiamento -> swaths -> protocolo v1.1 -> firmware.
+Ponta a ponta: STL -> fatiamento -> swaths -> protocolo -> firmware.
 
 E o teste que fecha o circuito. Se as gotas que o firmware simulado recebe
 batem com as gotas das camadas fatiadas, entao fatiador, compensacao,
