@@ -4,10 +4,13 @@ Plataforma aberta de controle e posicionamento de um cabeçote industrial de jat
 
 *An open platform for driving an industrial material jetting printhead (Xaar XJ128) for additive manufacturing research: ESP32-S3 firmware, a documented PC ↔ firmware protocol, and a desktop control program with a slicer. Documentation is in Portuguese.*
 
-Trabalho de Conclusão de Curso de Engenharia Mecatrônica na **UTFPR, Campus Curitiba**, desenvolvido no **NUFER** (Núcleo de Manufatura Aditiva e Ferramental).
+Trabalho de Conclusão de Curso de Engenharia Mecatrônica na **UTFPR, Campus Curitiba**.
 
-- **Autores:** Arthur Benatto Celestino (firmware e eletrônica) e Gabriela Kemper de Souza (programa de controle e mecânica)
+<!--
+- **Autores:** Arthur Benatto (firmware e eletrônica) e Gabriela Kemper (programa de controle e mecânica)
 - **Orientação:** Prof. Dr. Neri Volpato
+!-->
+
 
 <!-- FOTO: coloque aqui uma foto da máquina ou do cabeçote jateando, por exemplo:
 ![Máquina PAJM](docs/img/maquina.jpg)
