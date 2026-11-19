@@ -239,8 +239,10 @@ Decisões de 03/11/2026:
 - **Impressão monodirecional** (só em +X). O teste de alinhamento em X fica disponível na Calibração, mas sem onde aplicar.
 - **Computadores do laboratório:** Windows.
 
-O que continua em aberto:
+O que continua em aberto (esta é a lista completa; os outros documentos apontam para cá):
 
 1. Formato `.pajm` (`IMPORTACAO.md` v1.0): revisar com quem mantém o RP3.
 2. Conferir na máquina que X e Y não perdem passo no teto de 250 mm/s.
 3. Itens ainda não medidos da seção 11 do `PROTOCOL.md`: latência do ESTOP, vazão sustentada do enlace e reset do ESP ao abrir a porta.
+4. Período mínimo de disparo: validado com 200 µs; o limite de 180 µs do manual (T2) não foi testado com o cabeçote.
+5. Variante exata do cabeçote: o isolante cinza o coloca na família 128/40, mas não se sabe se é a L ou a W (revestimento da placa dos bicos). Para o fatiamento as duas são iguais; a diferença é de manutenção da tinta.
