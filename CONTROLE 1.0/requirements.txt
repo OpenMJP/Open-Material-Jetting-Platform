@@ -1,0 +1,20 @@
+# Dependencias do PAJM Controle.
+# Instalar em ambiente virtual FORA do OneDrive (o mesmo que o build.bat usa):
+#   python -m venv %USERPROFILE%\.venvs\pajm
+#   %USERPROFILE%\.venvs\pajm\Scripts\python.exe -m pip install -r requirements.txt
+
+numpy==2.5.2
+trimesh==5.1.0
+networkx==3.6.1          # necessario para trimesh fechar buracos (fill_holes)
+PySide6-Essentials==6.11.2
+pyqtgraph==0.14.0
+PyOpenGL==3.1.10
+pyserial==3.5             # porta COM do ESP32-S3 a 2 Mbaud
+pyinstaller==6.22.2
+
+# OPCIONAIS, fora do executavel.
+# pymupdf da suporte a PDF na impressao de imagem. Decisao de 27/10: so PNG
+# por enquanto, porque o PDF custa 19 MB no .exe. Instalar e religar em
+# PAJM_Controle.spec basta para voltar a funcionar.
+# pymupdf==1.28.2
+# pypdf==6.16.2    # usado so para ler os documentos do cabecote
