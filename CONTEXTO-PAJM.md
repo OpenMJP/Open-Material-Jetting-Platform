@@ -1,8 +1,8 @@
 # PAJM: contexto para desenvolvimento de software e firmware
 
 > Briefing para manter como `CLAUDE.md` na raiz dos repositórios de firmware e de software.
-> Versão 2 · 22/09/2026. Substitui a versão de 02/09/2026, que tinha valores do XJ128/200 e decisões hoje superadas.
-> O protocolo de comunicação está em `PROTOCOL.md` (v1.1), que é o contrato entre os dois lados. Em caso de conflito entre este arquivo e o PROTOCOL.md, vale o PROTOCOL.md.
+> Versão 3 · 18/11/2026. A versão 2 (22/09/2026) substituiu a de 02/09/2026, que tinha valores do XJ128/200 e decisões hoje superadas.
+> O protocolo de comunicação está em `PROTOCOL.md` (v1.4), que é o contrato entre os dois lados. Em caso de conflito entre este arquivo e o PROTOCOL.md, vale o PROTOCOL.md.
 > **[EM ABERTO]** = ainda não definido. **[VERIFICAR]** = confirmar na máquina.
 
 ---
@@ -100,7 +100,7 @@ Não usar: 35, 36, 37 (PSRAM); 0, 3, 45, 46 (strapping); 43, 44 (UART0, ligada a
 
 ### Mecânica
 
-Clone de Prusa I3, cinemática cartesiana, três NEMA 17 com drivers TMC2208 (VIO em 3,3 V). **40 passos/mm em X e Y** (25 µm por passo). Mesa de 200 mm, ou seja, ~8000 passos em X. **[EM ABERTO]** passos/mm do Z, que depende do fuso.
+Clone de Prusa I3, cinemática cartesiana, três NEMA 17 com drivers A4988 a 1/16 (o projeto da placa previa TMC2208). **80 passos/mm em X e Y** (GT2 com polia de 20 dentes, 12,5 µm por passo) e **400 passos/mm em Z** (fuso T8), todos medidos na máquina. Mesa de 200 × 200 mm, com o (0, 0) a 35 mm dos fins de curso de X e Y.
 
 Cabeçote montado a **31°** no carro. Reservatório de tinta abaixo dos bicos (pressão negativa); a altura do reservatório é parâmetro de processo e deve ser registrada com cada experimento.
 
