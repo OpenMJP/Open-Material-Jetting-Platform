@@ -1,0 +1,20 @@
+# Saidas de compilacao (firmware, PyInstaller)
+build/
+dist/
+*.exe
+__pycache__/
+*.pyc
+
+# Configuracao local de cada maquina: porta COM, caminho do ESP-IDF
+.vscode/
+Config espidf/
+
+# Estado gravado pelo programa de controle na maquina do laboratorio.
+# Os valores calibrados ja sao o padrao do perfil (pajm/profile.py).
+CONTROLE 1.0/ajustes_pajm.json
+CONTROLE 1.0/perfil_pajm.json
+
+# Material de trabalho que nao faz parte do projeto publicado: o briefing
+# inicial (substituido pelo CONTEXTO-PAJM.md) e o protocolo descartado
+Contexto PAJM/
+_protocolo_v0_removido/
