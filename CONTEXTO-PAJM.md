@@ -7,7 +7,7 @@
 
 ## 1. O projeto
 
-TCC de Engenharia Mecatrônica na UTFPR (Campus Curitiba), desenvolvido no NUFER por Arthur e Gabriela, com orientação do Prof. Dr. Neri Volpato. Objetivo: um sistema aberto de controle e posicionamento de cabeçote de jateamento de material (MJT), para pesquisa em manufatura aditiva. O que se busca é controle total da cadeia (padrão, dados e deposição), não apenas obter peças.
+TCC de Engenharia Mecatrônica na UTFPR (Campus Curitiba). Objetivo: um sistema aberto de controle e posicionamento de cabeçote de jateamento de material (MJT), para pesquisa em manufatura aditiva. O que se busca é controle total da cadeia (padrão, dados e deposição), não apenas obter peças.
 
 Requisitos do TCC que afetam o código:
 
@@ -18,8 +18,6 @@ Requisitos do TCC que afetam o código:
 - documentação concisa que permita a terceiros continuar o trabalho. O código é entregável de pesquisa.
 
 Escopo do TCC2: **jateamento 2D de padrões sobre substrato**, com tinta solvente. Fora do escopo: cura UV, construção de peças reais por camadas, suportes e balanços. O XJ128 não é compatível com resinas fotopolimerizáveis. O protocolo já prevê movimento em Z, e o programa de controle imprime camadas sobrepostas em papel como demonstração.
-
-Divisão: Arthur cuida do firmware e da eletrônica; Gabriela, do programa de controle e da mecânica.
 
 ---
 
