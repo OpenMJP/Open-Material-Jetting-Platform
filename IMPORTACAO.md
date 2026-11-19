@@ -179,4 +179,4 @@ E avisa, sem recusar, quando:
 
 ## 8. Exemplo de referência
 
-O fatiador do próprio PAJM Controle exporta qualquer peça fatiada neste formato (botão "Exportar camadas como .pajm..."). O arquivo gerado serve de exemplo para quem implementa o lado do RP3, e de teste: exportar e importar de volta tem de dar as mesmas camadas.
+O fatiador do próprio PAJM Controle exporta qualquer peça fatiada neste formato (botão "Exportar camadas como .pajm..."). O arquivo gerado serve de exemplo para quem implementa o lado do programa CAM, e de teste: exportar e importar de volta tem de dar as mesmas camadas.
