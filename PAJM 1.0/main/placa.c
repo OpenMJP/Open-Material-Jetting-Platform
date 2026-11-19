@@ -1,8 +1,11 @@
 // placa.c - GPIOs da placa pajm_V2.1
+#include "hal/gpio_ll.h"
+#include "soc/gpio_struct.h"
+#include "esp_attr.h"
 #include "placa.h"
 #include "pinos.h"
 
-static bool vpp_ligado;
+static volatile bool vpp_ligado;
 static bool motores_ligados;
 static int nivel_heartbeat;
 
@@ -83,11 +86,43 @@ bool placa_motores_ligar(void)
     return true;
 }
 
+void placa_motores_desligar(void)
+{
+    gpio_set_level(PINO_MOTOR_EN, 1);
+    motores_ligados = false;
+}
+
+void placa_vpp_ligar(void)
+{
+    gpio_set_level(PINO_NFIRE, 1);
+    gpio_set_level(PINO_NRESET, 0);
+    gpio_set_level(PINO_RELE_VPP, 1);
+    vpp_ligado = true;
+}
+
+void placa_cabecote_liberar(void)
+{
+    gpio_set_level(PINO_NRESET, 1);
+}
+
+void placa_cabecote_resetar(void)
+{
+    gpio_set_level(PINO_NRESET, 0);
+}
+
 void placa_vpp_desligar(void)
 {
     gpio_set_level(PINO_NFIRE, 1);
     gpio_set_level(PINO_NRESET, 0);
     gpio_set_level(PINO_RELE_VPP, 0);
+    vpp_ligado = false;
+}
+
+void IRAM_ATTR placa_corte_isr(void)
+{
+    gpio_ll_set_level(&GPIO, PINO_NFIRE, 1);
+    gpio_ll_set_level(&GPIO, PINO_NRESET, 0);
+    gpio_ll_set_level(&GPIO, PINO_RELE_VPP, 0);
     vpp_ligado = false;
 }
 

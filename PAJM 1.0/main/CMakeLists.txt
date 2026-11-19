@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "movimento.c" "app_main.c"
+    SRCS "cabecote.c" "movimento.c" "app_main.c"
          "placa.c"
          "crc.c"
          "quadro.c"
@@ -7,4 +7,5 @@ idf_component_register(
          "parametros.c"
          "sessao.c"
          "autoteste.c"
+         "swath.c"
     INCLUDE_DIRS ".")

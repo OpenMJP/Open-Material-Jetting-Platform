@@ -12,8 +12,8 @@
 #define PASSOS_POR_M_X  80000
 #define PASSOS_POR_M_Y  80000
 
-// Z: [EM ABERTO], depende do fuso. Provisório: fuso T8 (8 mm/volta) a 1/16,
-// 400 passos/mm. Com barra roscada M5 (0,8 mm/volta) seriam 4000 passos/mm.
+// Z: fuso T8 (8 mm/volta) a 1/16 = 400 passos/mm, confirmado por medição na
+// máquina em 03/11/2026.
 #define PASSOS_POR_M_Z  400000
 
 #define MM_PARA_PASSOS(mm, passos_por_m)  ((int32_t)((mm) * (passos_por_m) / 1000))
@@ -33,12 +33,14 @@
 // acima. São pontos de partida: calibrar e ajustar com SET_PARAM.
 #define ACCEL_X_INICIAL  MM_PARA_PASSOS(1000, PASSOS_POR_M_X)  // 1000 mm/s²
 #define ACCEL_Y_INICIAL  MM_PARA_PASSOS(500,  PASSOS_POR_M_Y)  //  500 mm/s²
-#define ACCEL_Z_INICIAL  MM_PARA_PASSOS(50,   PASSOS_POR_M_Z)  //   50 mm/s² [EM ABERTO]
-// 150 mm/s em X = 12 kHz, o maior valor já exercitado no teste_motores.
-// A seção 8.2 sugere 200 mm/s; subir depois de calibrar.
-#define VMAX_X_INICIAL   MM_PARA_PASSOS(150,  PASSOS_POR_M_X)
-#define VMAX_Y_INICIAL   MM_PARA_PASSOS(100,  PASSOS_POR_M_Y)
-#define VMAX_Z_INICIAL   MM_PARA_PASSOS(5,    PASSOS_POR_M_Z)  // [EM ABERTO]
+#define ACCEL_Z_INICIAL  MM_PARA_PASSOS(50,   PASSOS_POR_M_Z)  //   50 mm/s²
+// Teto de 250 mm/s em X e Y (03/11/2026) = 20 kHz de passo, metade do teto
+// da ISR (C_MIN, 40 kHz). Antes era 150 mm/s em X, o maior valor exercitado
+// no teste_motores, e 100 em Y. Z: 5 mm/s e 50 mm/s², mantidos por decisão
+// de 03/11/2026.
+#define VMAX_X_INICIAL   MM_PARA_PASSOS(250,  PASSOS_POR_M_X)
+#define VMAX_Y_INICIAL   MM_PARA_PASSOS(250,  PASSOS_POR_M_Y)
+#define VMAX_Z_INICIAL   MM_PARA_PASSOS(5,    PASSOS_POR_M_Z)
 #define RUNUP_MARGIN_INICIAL  MM_PARA_PASSOS(1, PASSOS_POR_M_X) // 1 mm
 
 // Sentido: nos três eixos o negativo vai para o endstop com o pino DIR em 1
@@ -60,6 +62,12 @@
 // com o carro na zona morta de X, fora da mesa: por isso HOME com Z também
 // referencia X, que termina em 0.
 #define HOME_SUBIDA_Z_MM     10
+
+// Espera entre ligar o VPP e liberar o nRESET. O manual (seção 6.1.2) pede
+// no mínimo 100 ms e manda medir na aplicação o tempo de carga dos
+// capacitores do cabeçote. [VERIFICAR] no analisador: o VPP tem de estar
+// estável antes da subida do nRESET.
+#define VPP_ESTABILIZA_MS  300
 
 // Abaixo disto (perto do endstop), um endstop acionado fora de HOME e JOG
 // não é tratado como falha: no 0 a chave está no limiar de acionamento.

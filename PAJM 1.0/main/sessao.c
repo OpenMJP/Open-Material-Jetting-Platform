@@ -5,16 +5,20 @@
 // que roda em outra tarefa; a conversa com ele é só pela interface dele.
 //
 // Referência executável do comportamento esperado:
-// SLICER 1.0/pajm/machine/simulador_v11.py
+// CONTROLE 1.0/pajm/machine/simulador.py
+#include <string.h>
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "sessao.h"
+#include "cabecote.h"
 #include "enlace.h"
 #include "movimento.h"
 #include "parametros.h"
 #include "placa.h"
 #include "protocolo.h"
 #include "maquina.h"
+#include "crc.h"
+#include "swath.h"
 
 static const char *TAG = "sessao";
 
@@ -33,8 +37,8 @@ static struct {
     uint8_t fault;
     uint8_t last_error;
     uint16_t job_id;
-    uint16_t swath_id;
-} m;
+    int recebendo;              // slot da swath entre BEGIN e END, ou -1
+} m = { .recebendo = -1 };
 
 // Estado planejado (seção 7.1): como a máquina vai estar depois de executar
 // tudo o que já está na fila. As validações olham para ele, não para o
@@ -42,6 +46,7 @@ static struct {
 static struct {
     uint8_t referenciados;
     int32_t pos[3];
+    bool vpp;
 } plano;
 
 static const int32_t CURSO[3] = { CURSO_X, CURSO_Y, CURSO_Z };
@@ -49,7 +54,6 @@ static const uint16_t PARAM_VMAX[3] = { PARAM_VMAX_X, PARAM_VMAX_Y, PARAM_VMAX_Z
 
 // ---- envio --------------------------------------------------------------
 
-static uint8_t swath_livres(void) { return SWATH_SLOTS; }
 static uint8_t fila_livres(void) { return movimento_fila_livre(); }
 
 static void enviar_ack(uint8_t seq)
@@ -100,10 +104,13 @@ static void enviar_status(void)
     if (placa_nfault_ativo()) {
         flags |= FLAG_NFAULT;
     }
+    if (swath_em_andamento()) {
+        flags |= FLAG_SWATH_ATIVA;
+    }
 
     uint8_t p[24] = { m.estado, flags };
     put_u16(p + 2, m.job_id);
-    put_u16(p + 4, m.swath_id);
+    put_u16(p + 4, swath_id_atual());
     p[6] = swath_livres();
     p[7] = fila_livres();
     put_i32(p + 8, movimento_posicao(0));
@@ -117,12 +124,23 @@ static void enviar_status(void)
 
 // ---- ações --------------------------------------------------------------
 
+// Slots recebendo e na fila. A swath em execução é liberada pela tarefa de
+// movimento quando ela para.
+static void descartar_swaths(void)
+{
+    swath_descartar_pendentes();
+    m.recebendo = -1;
+}
+
 // Rotina de desligamento (seção 7.7). A rampa de parada corre na tarefa de
 // movimento; a sessão não espera por ela, então o STOPPING ainda não aparece.
 static void desligar(uint8_t motivo)
 {
-    placa_vpp_desligar();
     movimento_cancelar();
+    descartar_swaths();
+    cabecote_vigiar_nfault(false);
+    placa_vpp_desligar();
+    plano.vpp = false;
     m.estado = EST_IDLE;
     m.last_error = motivo;
 }
@@ -132,8 +150,11 @@ static void desligar(uint8_t motivo)
 static void falhar(uint8_t codigo)
 {
     movimento_parar_ja();
+    descartar_swaths();
     placa_estado_seguro();
+    cabecote_vigiar_nfault(false);
     plano.referenciados = 0;
+    plano.vpp = false;
     m.estado = EST_FAULT;
     m.fault = codigo;
     ESP_LOGW(TAG, "FAULT 0x%02x", codigo);
@@ -162,6 +183,7 @@ static int tamanho_esperado(uint8_t op)
 {
     switch (op) {
     case OP_PING: case OP_CLEAR_FAULT: case OP_JOB_END: case OP_SAVE_PARAMS:
+    case OP_MOTORS_OFF:
         return 0;
     case OP_HOME: case OP_HEAD_POWER:
         return 1;
@@ -192,7 +214,153 @@ static bool tamanho_ok(uint8_t op, uint16_t len)
     return t == len;
 }
 
-static uint8_t despachar(uint8_t op, const uint8_t *p, int32_t *det)
+// ---- swaths (seção 7.5) -------------------------------------------------
+
+static uint8_t swath_begin(const uint8_t *p, int32_t *det)
+{
+    if (m.estado != EST_JOB) {
+        *det = m.estado;
+        return ERR_BAD_STATE;
+    }
+    if (m.recebendo >= 0) {     // BEGIN sem o END da anterior
+        *det = swath_slot(m.recebendo)->recebidas;
+        return ERR_SWATH_SEQUENCE;
+    }
+    if (swath_livres() == 0) {
+        return ERR_NO_SWATH_SLOT;
+    }
+
+    uint8_t flags = p[2], pitch = p[3];
+    int32_t y = get_i32(p + 4), x_start = get_i32(p + 8);
+    uint16_t n_cols = get_u16(p + 12), atraso = get_u16(p + 14);
+    uint32_t vel = get_u32(p + 16);
+
+    // Na v1.0 do firmware só se imprime em +X (dir = 1 é reservado)
+    if (flags & ~0x02) {
+        *det = 2;
+        return ERR_BAD_PARAM;
+    }
+    if ((plano.referenciados & 0x03) != 0x03) {
+        *det = 0x03;
+        return ERR_NOT_HOMED;
+    }
+    if (!plano.vpp) {
+        return ERR_HEAD_OFF;
+    }
+    if (n_cols < 1 || n_cols > MAX_COLS || pitch < 1) {
+        *det = 12;
+        return ERR_BAD_PARAM;
+    }
+    if (vel == 0 || vel > (uint32_t)parametro(PARAM_VMAX_X)) {
+        *det = 16;
+        return ERR_BAD_PARAM;
+    }
+    uint32_t periodo = (uint32_t)(1000000ULL * pitch / vel);
+    if (periodo < (uint32_t)parametro(PARAM_MIN_FIRE_PERIOD)) {
+        *det = periodo;
+        return ERR_FIRE_TOO_FAST;
+    }
+    if (atraso >= periodo) {
+        *det = 14;
+        return ERR_BAD_PARAM;
+    }
+
+    // d = ⌈speed² / (2·ACCEL_X)⌉ + RUNUP_MARGIN
+    uint64_t dois_a = 2ULL * (uint32_t)parametro(PARAM_ACCEL_X);
+    int32_t d = (int32_t)(((uint64_t)vel * vel + dois_a - 1) / dois_a)
+              + parametro(PARAM_RUNUP_MARGIN);
+    int32_t x_end = x_start + (int32_t)(n_cols - 1) * pitch;
+    if (x_start - d < 0 || x_start - d > CURSO_X) {
+        *det = x_start - d;
+        return ERR_OUT_OF_TRAVEL;
+    }
+    if (x_end + d < 0 || x_end + d > CURSO_X) {
+        *det = x_end + d;
+        return ERR_OUT_OF_TRAVEL;
+    }
+    if (y < 0 || y > CURSO_Y) {
+        *det = y;
+        return ERR_OUT_OF_TRAVEL;
+    }
+
+    int i = swath_reservar();
+    if (i < 0) {
+        return ERR_NO_SWATH_SLOT;
+    }
+    swath_t *s = swath_slot(i);
+    s->id = get_u16(p);
+    s->flags = flags;
+    s->pitch = pitch;
+    s->y = y;
+    s->x_start = x_start;
+    s->n_cols = n_cols;
+    s->fire_delay_us = atraso;
+    s->vel = vel;
+    s->recuo = d;
+    s->recebidas = 0;
+    s->crc = 0;
+    m.recebendo = i;
+    return ERR_OK;
+}
+
+static uint8_t swath_data(const uint8_t *p, uint16_t len, int32_t *det)
+{
+    if (m.recebendo < 0) {
+        *det = 0;
+        return ERR_SWATH_SEQUENCE;
+    }
+    swath_t *s = swath_slot(m.recebendo);
+    uint16_t n = (len - 4) / BYTES_POR_COLUNA;
+    if (get_u16(p) != s->id || get_u16(p + 2) != s->recebidas
+        || s->recebidas + n > s->n_cols) {
+        *det = s->recebidas;
+        return ERR_SWATH_SEQUENCE;
+    }
+    const uint8_t *dados = p + 4;
+    size_t bytes = (size_t)n * BYTES_POR_COLUNA;
+    memcpy(s->dados + (size_t)s->recebidas * BYTES_POR_COLUNA, dados, bytes);
+    s->crc = crc32(s->crc, dados, bytes);
+    s->recebidas += n;
+    return ERR_OK;
+}
+
+static uint8_t swath_end(const uint8_t *p, int32_t *det)
+{
+    if (m.recebendo < 0) {
+        *det = 0;
+        return ERR_SWATH_SEQUENCE;
+    }
+    int i = m.recebendo;
+    swath_t *s = swath_slot(i);
+    if (get_u16(p) != s->id) {
+        *det = s->recebidas;
+        return ERR_SWATH_SEQUENCE;
+    }
+    // Daqui em diante o slot sai da recepção, com ou sem erro
+    m.recebendo = -1;
+    if (s->recebidas != s->n_cols) {
+        swath_liberar(i);
+        *det = s->recebidas;
+        return ERR_SWATH_INCOMPLETE;
+    }
+    if (s->crc != get_u32(p + 4)) {
+        swath_liberar(i);
+        *det = (int32_t)s->crc;
+        return ERR_SWATH_CRC;
+    }
+
+    // NA_FILA antes de enfileirar: a tarefa de movimento pode pegá-la na hora
+    swath_enfileirada(i);
+    if (enfileirar((comando_t){ .tipo = CMD_SWATH, .valor = i }) != ERR_OK) {
+        swath_liberar(i);
+        return ERR_NO_QUEUE_SLOT;
+    }
+    plano.pos[0] = s->x_start + (int32_t)(s->n_cols - 1) * s->pitch + s->recuo;
+    plano.pos[1] = s->y;
+    return ERR_OK;
+}
+
+static uint8_t despachar(uint8_t op, const uint8_t *p, uint16_t len, int32_t *det)
 {
     // Restrições por estado (seção 7.1)
     if (m.estado == EST_FAULT
@@ -220,12 +388,18 @@ static uint8_t despachar(uint8_t op, const uint8_t *p, int32_t *det)
         m.fault = 0;
         return ERR_OK;
 
-    case OP_SET_PARAM:
+    case OP_SET_PARAM: {
         if (m.estado != EST_IDLE || !movimento_ocioso()) {
             *det = m.estado;
             return ERR_BAD_STATE;
         }
-        return parametros_definir(get_u16(p), get_i32(p + 4), det);
+        uint8_t codigo = parametros_definir(get_u16(p), get_i32(p + 4), det);
+        // A vigilância do nFAULT segue o CHECK_READY (modo sem cabeçote)
+        if (codigo == ERR_OK && get_u16(p) == PARAM_CHECK_READY && placa_vpp_ligado()) {
+            cabecote_vigiar_nfault(get_i32(p + 4) != 0);
+        }
+        return codigo;
+    }
 
     case OP_GET_PARAM: {
         uint16_t id = get_u16(p);
@@ -335,11 +509,79 @@ static uint8_t despachar(uint8_t op, const uint8_t *p, int32_t *det)
         return codigo;
     }
 
+    case OP_MOTORS_OFF: {
+        if (m.estado != EST_IDLE) {
+            *det = m.estado;
+            return ERR_BAD_STATE;
+        }
+        uint8_t codigo = enfileirar((comando_t){ .tipo = CMD_MOTORES_OFF });
+        if (codigo == ERR_OK) {
+            plano.referenciados = 0;
+        }
+        return codigo;
+    }
+
     case OP_DWELL:
         return enfileirar((comando_t){ .tipo = CMD_DWELL, .valor = (int32_t)get_u32(p) });
 
+    case OP_HEAD_POWER: {
+        bool ligar = p[0] != 0;
+        uint8_t codigo = enfileirar((comando_t){ .tipo = CMD_HEAD_POWER, .eixo = ligar });
+        if (codigo == ERR_OK) {
+            plano.vpp = ligar;
+        }
+        return codigo;
+    }
+
+    case OP_SPIT: {
+        uint16_t n = get_u16(p);
+        uint16_t periodo = get_u16(p + 2);
+        if (!plano.vpp) {
+            return ERR_HEAD_OFF;
+        }
+        if (periodo < parametro(PARAM_MIN_FIRE_PERIOD)) {
+            *det = periodo;
+            return ERR_FIRE_TOO_FAST;
+        }
+        comando_t c = { .tipo = CMD_SPIT, .valor = n, .vel = periodo };
+        memcpy(c.coluna, p + 4, BYTES_POR_COLUNA);
+        return enfileirar(c);
+    }
+
+    case OP_JOB_BEGIN:
+        if (m.estado != EST_IDLE) {
+            *det = m.estado;
+            return ERR_BAD_STATE;
+        }
+        movimento_job_terminou();       // descarta um aviso velho
+        m.job_id = get_u16(p);
+        m.estado = EST_JOB;
+        m.last_error = 0;
+        ESP_LOGI(TAG, "job %u começou (%u swaths previstas)", m.job_id, get_u16(p + 2));
+        return ERR_OK;
+
+    case OP_JOB_END: {
+        if (m.estado != EST_JOB) {
+            *det = m.estado;
+            return ERR_BAD_STATE;
+        }
+        uint8_t codigo = enfileirar((comando_t){ .tipo = CMD_JOB_END });
+        if (codigo == ERR_OK) {
+            plano.vpp = false;
+        }
+        return codigo;
+    }
+
+    case OP_SWATH_BEGIN:
+        return swath_begin(p, det);
+
+    case OP_SWATH_DATA:
+        return swath_data(p, len, det);
+
+    case OP_SWATH_END:
+        return swath_end(p, det);
+
     default:
-        // Conhecido pelo protocolo, mas ainda não implementado
         *det = op;
         return ERR_UNKNOWN_OPCODE;
     }
@@ -357,7 +599,7 @@ static void tratar(const quadro_t *q)
         codigo = ERR_BAD_LENGTH;
         det = q->len;
     } else {
-        codigo = despachar(q->tipo, q->payload, &det);
+        codigo = despachar(q->tipo, q->payload, q->len, &det);
     }
 
     if (codigo != ERR_OK) {
@@ -447,7 +689,14 @@ void sessao_periodico(int64_t agora)
     if (f && m.estado != EST_FAULT) {
         falhar(f);
     }
+    // JOB_END alcançado na fila: o VPP já foi desligado lá
+    if (movimento_job_terminou() && m.estado == EST_JOB) {
+        m.estado = EST_IDLE;
+        m.last_error = 0;
+        ESP_LOGI(TAG, "job %u terminou", m.job_id);
+    }
     if (movimento_ocioso()) {
+        plano.vpp = placa_vpp_ligado();
         plano.referenciados = movimento_referenciados();
         for (int e = 0; e < 3; e++) {
             plano.pos[e] = movimento_posicao(e);
@@ -463,9 +712,21 @@ void sessao_periodico(int64_t agora)
         if (m.estado == EST_JOB) {
             desligar(ERR_LINK_LOST);
         } else if (m.estado == EST_IDLE) {
-            movimento_cancelar();           // movimento manual: para com rampa
+            // movimento manual: para com rampa; o VPP cai junto
+            movimento_cancelar();
+            cabecote_vigiar_nfault(false);
+            placa_vpp_desligar();
+            plano.vpp = false;
         }
-        ESP_LOGW(TAG, "enlace perdido, sessão encerrada");
+        // Sem o PC ninguém comanda a máquina (v1.4): os drivers desligam
+        // depois da rampa. Entra na fila já da geração nova, então só roda
+        // quando o movimento cancelado terminar de frear. Em FAULT os
+        // drivers já estão desligados.
+        if (m.estado != EST_FAULT) {
+            movimento_enfileirar((comando_t){ .tipo = CMD_MOTORES_OFF });
+            plano.referenciados = 0;
+        }
+        ESP_LOGW(TAG, "enlace perdido: sessão encerrada, cabeçote e motores desligados");
         return;
     }
 

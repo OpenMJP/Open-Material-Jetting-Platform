@@ -1,4 +1,4 @@
-// protocolo.h - constantes e códigos do PROTOCOL.md v1.1
+// protocolo.h - constantes e códigos do PROTOCOL.md v1.4
 //
 // Este arquivo só traduz o PROTOCOL.md para C. Qualquer mudança começa
 // lá, com incremento de versão (seção 12), e depois vem para cá.
@@ -7,7 +7,7 @@
 #include <stdint.h>
 
 #define PROTO_MAJOR  1
-#define PROTO_MINOR  1
+#define PROTO_MINOR  4
 
 #define FW_MAJOR  0
 #define FW_MINOR  1
@@ -23,7 +23,7 @@
 #define STATUS_PERIOD_MS     100
 #define LINK_TIMEOUT_MS      1000
 #define SWATH_SLOTS          4
-#define MAX_COLS             8192
+#define MAX_COLS             20000   // v1.2: 245 mm de X com pitch 1
 #define QUEUE_SLOTS          32
 #define BYTES_POR_COLUNA     16
 
@@ -48,6 +48,7 @@ enum {
     OP_SET_PARAM    = 0x41,
     OP_GET_PARAM    = 0x42,
     OP_SAVE_PARAMS  = 0x43,
+    OP_MOTORS_OFF   = 0x44,   // v1.3
 
     OP_HELLO_ACK    = 0x80,
     OP_ACK          = 0x81,

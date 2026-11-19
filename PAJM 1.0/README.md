@@ -1,8 +1,8 @@
 # Firmware do PAJM
 
 Firmware do ESP32-S3 (YD-ESP32-S3 N16R8) que controla o posicionamento e o
-disparo do cabeçote Xaar XJ128/360. Fala com o PAJM Slicer pelo protocolo
-descrito em `../PROTOCOL.md` (v1.1), que é o contrato entre os dois lados.
+disparo do cabeçote Xaar XJ128/360. Fala com o PAJM Controle pelo protocolo
+descrito em `../PROTOCOL.md` (v1.4), que é o contrato entre os dois lados.
 
 Fronteira: o PC não faz timing; o firmware não faz geometria.
 
@@ -22,7 +22,7 @@ pela UART0.
 Para testar o protocolo, com o monitor fechado na porta do CH343P:
 
 ```
-cd "../SLICER 1.0"
+cd "../CONTROLE 1.0"
 python ferramentas/bringup.py COMy
 ```
 
@@ -38,6 +38,7 @@ python ferramentas/bringup.py COMy
 | `main/crc.c`, `main/quadro.c` | CRC-16, CRC-32, COBS e montagem de quadros (funções puras) |
 | `main/enlace.c` | UART0 e envio/recepção de quadros |
 | `main/sessao.c` | Go-Back-N, sessão, estados, estado planejado e tratamento dos opcodes |
+| `main/cabecote.c` | CLK de 1 MHz, SPI2 (nSS2 e nSS1), nFIRE, READY e nFAULT; tarefa no núcleo 1 |
 | `main/movimento.c` | fila de execução, HOME, JOG, MOVE, DWELL; passos por timer com rampa (AVR446) |
 | `main/parametros.c` | SET/GET/SAVE_PARAM, com persistência na NVS |
 | `main/autoteste.c` | confere os vetores da seção 10 a cada boot |
@@ -64,6 +65,8 @@ Decisões que se afastam da letra do PROTOCOL.md, de propósito:
   (o simulador do slicer faz o mesmo).
 - O bit nFAULT do STATUS só é reportado com VPP ligado; sem cabeçote o
   pino pode flutuar.
+- `CHECK_READY = 0`, que o protocolo reserva para testes sem cabeçote,
+  também desliga a vigilância do nFAULT, pelo mesmo motivo.
 
 ### Etapa 2: movimento (concluída)
 
@@ -83,6 +86,20 @@ Validado na máquina em 26/10/2026, pela aba de comandos manuais do slicer:
 HOME dos três eixos, JOG e MOVE em X, Y e Z, CANCEL com rampa, ESTOP com
 bloqueio de movimento até o CLEAR_FAULT. JOG de 100 mm em X e Y mede 100 mm
 (80 passos/mm e polia de 20 dentes confirmados).
+
+### Etapa 3: cabeçote parado (implementada, a conferir no analisador)
+
+HEAD_POWER e SPIT, pela fila de execução. Energização conforme a seção
+6.1.2 do manual: nRESET ativo, liga o VPP, espera 300 ms e libera o nRESET;
+para desligar, nRESET ativo antes de cortar o VPP. CLK livre de 1 MHz pelo
+LEDC. Coluna pelo SPI2 a 2 MHz, modo 0, nSS2 e depois nSS1 (64 bits cada).
+Disparo: espera o READY alto, pulso de 3 µs no nFIRE, confere a queda do
+READY em até 10 µs (T3 é de até 3,35 µs) e carrega a próxima coluna com o
+READY baixo. nFAULT por interrupção leva a FAULT (HEAD_NFAULT). O disparo
+roda numa tarefa no núcleo 1, exclusivo do cabeçote.
+
+Ordem de validação: primeiro os sinais no analisador lógico, sem o cabeçote
+(`CHECK_READY = 0`); só depois o cabeçote real, primeiro sem tinta.
 
 ### Em aberto
 

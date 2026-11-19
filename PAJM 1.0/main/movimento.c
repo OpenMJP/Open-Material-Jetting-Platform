@@ -20,12 +20,14 @@
 #include "esp_attr.h"
 #include "esp_log.h"
 #include "esp_rom_sys.h"
+#include "cabecote.h"
 #include "movimento.h"
 #include "parametros.h"
 #include "placa.h"
 #include "pinos.h"
 #include "protocolo.h"
 #include "maquina.h"
+#include "swath.h"
 
 static const char *TAG = "mov";
 
@@ -83,6 +85,7 @@ static volatile uint8_t referenciados;
 static atomic_uint geracao;         // muda a cada CANCEL e ESTOP
 static atomic_int ocupadas;         // na fila + em execução
 static atomic_uint falha;
+static atomic_bool job_terminou;
 static QueueHandle_t fila;
 static gptimer_handle_t timer;
 static TaskHandle_t tarefa;
@@ -384,15 +387,184 @@ static void comando_jog(const comando_t *c)
     executar_ate(e, alvo, c->vel, alvo < posicao[e], c->geracao);
 }
 
-static void comando_move(const comando_t *c)
+// Movimento absoluto com o endstop como sinal de passos perdidos (MOVE e
+// posicionamento da swath)
+static resultado_t mover(int e, int32_t alvo, uint32_t vel, unsigned ger)
 {
-    int e = c->eixo;
     // Perto do 0 a chave está no limiar de acionamento; abaixo da margem o
     // endstop não é vigiado.
-    bool vigiar = c->valor < posicao[e] && c->valor >= mm_para_passos(e, MARGEM_ENDSTOP_MM);
-    if (executar_ate(e, c->valor, c->vel, vigiar, c->geracao) == RES_FIM) {
-        falhar(FALHA_ENDSTOP, "endstop acionado durante MOVE: passos perdidos?", e);
+    bool vigiar = alvo < posicao[e] && alvo >= mm_para_passos(e, MARGEM_ENDSTOP_MM);
+    resultado_t r = executar_ate(e, alvo, vel, vigiar, ger);
+    if (r == RES_FIM) {
+        falhar(FALHA_ENDSTOP, "endstop acionado durante movimento: passos perdidos?", e);
     }
+    return r;
+}
+
+static void comando_move(const comando_t *c)
+{
+    mover(c->eixo, c->valor, c->vel, c->geracao);
+}
+
+// Pulso de nRESET com o VPP ligado (T23 >= 500 ns): reinicia a lógica de
+// sequência dos chips sem apagar o registrador de dados (manual, seção 5.3).
+// Em 26/10/2026 um dos chips ficou num estado em que a sua metade não
+// jateava, e só um ciclo de nRESET o recuperou.
+static void pulsar_reset_cabecote(void)
+{
+    taskENTER_CRITICAL(&trava);
+    if (placa_vpp_ligado()) {
+        placa_cabecote_resetar();
+        esp_rom_delay_us(1);
+        placa_cabecote_liberar();
+    }
+    taskEXIT_CRITICAL(&trava);
+    vTaskDelay(pdMS_TO_TICKS(1));
+}
+
+// Seção 6.1.2 do manual: nRESET ativo, liga o VPP, espera ele estabilizar
+// e só então libera o nRESET. Desligar: nRESET ativo antes de cortar o VPP.
+static void comando_head_power(const comando_t *c)
+{
+    if (!c->eixo) {
+        cabecote_vigiar_nfault(false);
+        taskENTER_CRITICAL(&trava);
+        placa_vpp_desligar();
+        taskEXIT_CRITICAL(&trava);
+        return;
+    }
+    if (placa_vpp_ligado()) {
+        // "Ligar" de novo também recupera um chip travado
+        pulsar_reset_cabecote();
+        return;
+    }
+
+    // Dentro da trava pelo mesmo motivo dos motores: um ESTOP entre a
+    // conferência e o gpio_set_level religaria o VPP em FAULT.
+    taskENTER_CRITICAL(&trava);
+    bool valido = c->geracao == atomic_load(&geracao);
+    if (valido) {
+        placa_vpp_ligar();
+    }
+    taskEXIT_CRITICAL(&trava);
+    if (!valido) {
+        return;
+    }
+
+    TickType_t fim = xTaskGetTickCount() + pdMS_TO_TICKS(VPP_ESTABILIZA_MS);
+    while ((int32_t)(fim - xTaskGetTickCount()) > 0) {
+        if (c->geracao != atomic_load(&geracao)) {
+            // Interrompido no meio: não deixa VPP ligado com o cabeçote em reset
+            taskENTER_CRITICAL(&trava);
+            placa_vpp_desligar();
+            taskEXIT_CRITICAL(&trava);
+            return;
+        }
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+
+    taskENTER_CRITICAL(&trava);
+    valido = c->geracao == atomic_load(&geracao) && placa_vpp_ligado();
+    if (valido) {
+        placa_cabecote_liberar();
+    }
+    taskEXIT_CRITICAL(&trava);
+    if (valido) {
+        vTaskDelay(pdMS_TO_TICKS(1));
+        // CHECK_READY = 0 é o modo de teste sem cabeçote (seção 8.2): sem
+        // ele o nFAULT flutua e derrubaria tudo na hora.
+        bool vigiar = parametro(PARAM_CHECK_READY) != 0;
+        cabecote_vigiar_nfault(vigiar);
+        ESP_LOGI(TAG, "cabeçote energizado%s", vigiar ? "" : " (sem vigiar o nFAULT)");
+    }
+}
+
+static void comando_spit(const comando_t *c)
+{
+    if (!placa_vpp_ligado()) {
+        return;         // VPP caiu depois da validação (nFAULT): a falha já foi registrada
+    }
+    pulsar_reset_cabecote();
+    cab_resultado_t r = cabecote_disparar_parado((uint16_t)c->valor, (uint16_t)c->vel, c->coluna,
+                                                 parametro(PARAM_CHECK_READY) != 0);
+    if (r == CAB_READY_TIMEOUT) {
+        ESP_LOGE(TAG, "SPIT: READY fora do tempo (CHECK_READY = 0 desliga a conferência)");
+        atomic_store(&falha, FALHA_READY_TIMEOUT);
+    }
+}
+
+// Seção 7.5: posiciona Y e X (recuo d antes de x_start), acelera o X por
+// toda a swath e o núcleo 1 dispara as colunas pela posição. O slot é
+// liberado no fim, com ou sem sucesso.
+static void comando_swath(const comando_t *c)
+{
+    int slot = c->valor;
+    if (!swath_comecar(slot)) {
+        return;         // descartado por CANCEL ou falha
+    }
+    const swath_t *s = swath_slot(slot);
+    unsigned ger = c->geracao;
+    int32_t inicio = s->x_start - s->recuo;
+    int32_t fim = s->x_start + (int32_t)(s->n_cols - 1) * s->pitch + s->recuo;
+
+    if (!placa_vpp_ligado()
+        || mover(1, s->y, parametro(PARAM_VMAX_Y), ger) != RES_OK
+        || mover(0, inicio, parametro(PARAM_VMAX_X), ger) != RES_OK) {
+        swath_liberar(slot);
+        return;
+    }
+
+    pulsar_reset_cabecote();
+    const cab_swath_t cs = {
+        .dados = s->dados,
+        .n_cols = s->n_cols,
+        .x_start = s->x_start,
+        .pitch = s->pitch,
+        .fire_delay_us = s->fire_delay_us,
+        .pho_cba = (s->flags & 0x02) != 0,
+    };
+    cabecote_swath_iniciar(&cs, parametro(PARAM_CHECK_READY) != 0);
+    resultado_t r = executar(0, +1, (uint32_t)(fim - inicio), s->vel,
+                             parametro(PARAM_ACCEL_X), false, ger);
+    cab_resultado_t rc = cabecote_swath_terminar(r != RES_OK);
+    swath_liberar(slot);
+
+    if (r != RES_OK) {
+        return;         // CANCEL ou ESTOP: quem parou já tratou
+    }
+    if (rc == CAB_READY_TIMEOUT) {
+        atomic_store(&falha, FALHA_READY_TIMEOUT);
+    } else if (rc == CAB_OVERRUN) {
+        atomic_store(&falha, FALHA_FIRE_OVERRUN);
+    }
+}
+
+// Seção 7.7, no fim normal do job: o resto (estado IDLE) é com a sessão
+static void comando_job_end(const comando_t *c)
+{
+    cabecote_vigiar_nfault(false);
+    taskENTER_CRITICAL(&trava);
+    bool valido = c->geracao == atomic_load(&geracao);
+    if (valido) {
+        placa_vpp_desligar();
+    }
+    taskEXIT_CRITICAL(&trava);
+    if (valido) {
+        atomic_store(&job_terminou, true);
+    }
+}
+
+// MOTORS_OFF (v1.3): sem os drivers os eixos podem ser movidos à mão, então
+// a posição deixa de valer e todos perdem a referência
+static void comando_motores_off(const comando_t *c)
+{
+    taskENTER_CRITICAL(&trava);
+    if (c->geracao == atomic_load(&geracao)) {
+        placa_motores_desligar();
+        referenciados = 0;
+    }
+    taskEXIT_CRITICAL(&trava);
+    ESP_LOGI(TAG, "motores desligados; eixos sem referência");
 }
 
 static void comando_dwell(const comando_t *c)
@@ -427,6 +599,11 @@ static void tarefa_movimento(void *arg)
             case CMD_JOG:   comando_jog(&c);   break;
             case CMD_MOVE:  comando_move(&c);  break;
             case CMD_DWELL: comando_dwell(&c); break;
+            case CMD_HEAD_POWER: comando_head_power(&c); break;
+            case CMD_SPIT:  comando_spit(&c);  break;
+            case CMD_SWATH: comando_swath(&c); break;
+            case CMD_JOB_END: comando_job_end(&c); break;
+            case CMD_MOTORES_OFF: comando_motores_off(&c); break;
             }
         }
         atomic_fetch_sub(&ocupadas, 1);
@@ -474,6 +651,7 @@ void movimento_cancelar(void)
         mv.parar = true;
     }
     taskEXIT_CRITICAL(&trava);
+    cabecote_abortar();
 }
 
 void movimento_parar_ja(void)
@@ -487,6 +665,7 @@ void movimento_parar_ja(void)
         mv.ativo = false;
     }
     taskEXIT_CRITICAL(&trava);
+    cabecote_abortar();
     xTaskNotifyGive(tarefa);
 }
 
@@ -500,7 +679,17 @@ int32_t movimento_posicao(int eixo)
     return posicao[eixo];
 }
 
+bool movimento_job_terminou(void)
+{
+    return atomic_exchange(&job_terminou, false);
+}
+
 uint8_t movimento_falha_pendente(void)
 {
     return (uint8_t)atomic_exchange(&falha, 0);
+}
+
+void IRAM_ATTR movimento_sinalizar_falha(uint8_t codigo)
+{
+    atomic_store(&falha, codigo);
 }

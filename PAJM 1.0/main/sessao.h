@@ -1,8 +1,8 @@
 // sessao.h - transporte, sessão e aplicação (PROTOCOL.md, seções 4, 5 e 7)
 //
 // Implementado: HELLO, Go-Back-N, PING, STATUS periódico, perda de enlace,
-// ESTOP, CANCEL, CLEAR_FAULT, parâmetros, HOME, JOG, MOVE e DWELL. Job,
-// cabeçote e swaths ainda respondem ERR UNKNOWN_OPCODE.
+// ESTOP, CANCEL, CLEAR_FAULT, parâmetros, HOME, JOG, MOVE, DWELL,
+// HEAD_POWER, SPIT, JOB_BEGIN, JOB_END, SWATH_BEGIN/DATA/END e MOTORS_OFF.
 #pragma once
 
 #include <stdbool.h>
