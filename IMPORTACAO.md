@@ -2,7 +2,7 @@
 
 Versão **1.0** · 03/11/2026 · Status: proposta para revisão com o RP3
 
-Este documento define o arquivo que um programa de planejamento de processo (CAM), como o RP3 do laboratório, gera para o **PAJM Controle** imprimir. O RP3 decide a geometria de cada camada. O PAJM Controle decide como jatear cada camada: faixas, compensação do cabeçote, purga e envio à máquina.
+Este documento define o arquivo que um programa de planejamento de processo (CAM) gera para o **PAJM Controle** imprimir. O programa CAM decide a geometria de cada camada. O programa de controle da PAJM decide como jatear cada camada: faixas, compensação do cabeçote, purga e envio à máquina.
 
 O arquivo não contém G-code nem nada específico do cabeçote. Ele contém só a sequência de camadas como imagens e os parâmetros que as descrevem.
 
